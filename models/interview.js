@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const Joi = require("joi");
 JoiObjectId = require("joi-objectid")(Joi);
 
+// Create Schema for Interview Model
 const interviewSchema = new mongoose.Schema({
   interviewers: [
     {
@@ -9,7 +10,7 @@ const interviewSchema = new mongoose.Schema({
       ref: "User",
       required: true,
       validate: {
-        validator: async function (value) {
+        validator: async (value) => {
           const user = await mongoose.model("User").findById(value);
           return user && user.roleType === "interviewer";
         },
@@ -22,7 +23,7 @@ const interviewSchema = new mongoose.Schema({
     ref: "User",
     required: true,
     validate: {
-      validator: async function (value) {
+      validator: async (value) => {
         const user = await mongoose.model("User").findById(value);
         return user && user.roleType === "candidate";
       },
@@ -61,8 +62,10 @@ const interviewSchema = new mongoose.Schema({
   },
 });
 
+// Create Interview Model from the Schema
 const Interview = mongoose.model("Interview", interviewSchema);
 
+// Validate Interview Model
 async function validateSchema(interview) {
   const schema = Joi.object({
     interviewers: Joi.array()
@@ -81,5 +84,6 @@ async function validateSchema(interview) {
   return schema.validate(interview);
 }
 
+// Export Interview Model
 module.exports.Interview = Interview;
 module.exports.validateSchema = validateSchema;

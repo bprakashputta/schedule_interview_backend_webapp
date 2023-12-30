@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const Joi = require("joi");
 JoiObjectId = require("joi-objectid")(Joi);
 
+// Create Schema for User Model
 const userSchema = new mongoose.Schema({
   username: {
     type: String,
@@ -44,8 +45,10 @@ const userSchema = new mongoose.Schema({
   ],
 });
 
+// Create User Model from the Schema
 const User = mongoose.model("User", userSchema);
 
+// Validate User Model
 async function validateUser(user) {
   const schema = Joi.object({
     username: Joi.string().required().max(255),
@@ -60,5 +63,6 @@ async function validateUser(user) {
   return schema.validate(user);
 }
 
+// Export User Model
 module.exports.User = User;
 module.exports.validateUser = validateUser;
