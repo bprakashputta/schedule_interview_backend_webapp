@@ -20,6 +20,20 @@ mongoose
     console.log(err);
   });
 
+// const interview = require("./routes/interviews");
+const users = require("./routes/users");
+
+app.set("view engine", "ejs");
+
+// Middlewares
+app.use(express.json());
+app.use(express.urlencoded({ extended: true })); // parse url parameters to request body
+app.use(express.static("public")); // Serve static files like html, images, javascript to server
+app.use(helmet()); // Secures the app by applying HTTP headers
+
+// Routes
+app.use("/api/user", users);
+
 app.listen(PORT, (err) => {
   if (err) {
     return err.message;

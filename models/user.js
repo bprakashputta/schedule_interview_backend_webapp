@@ -65,4 +65,4 @@ async function validateUser(user) {
 
 // Export User Model
 module.exports.User = User;
-module.exports.validateUser = validateUser;
+module.exports.validate = validateUser;
