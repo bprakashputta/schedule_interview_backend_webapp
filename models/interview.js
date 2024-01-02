@@ -86,4 +86,4 @@ async function validateSchema(interview) {
 
 // Export Interview Model
 module.exports.Interview = Interview;
-module.exports.validateSchema = validateSchema;
+module.exports.validate = validateSchema;

@@ -20,7 +20,7 @@ mongoose
     console.log(err);
   });
 
-// const interview = require("./routes/interviews");
+const interviews = require("./routes/interviews");
 const users = require("./routes/users");
 
 app.set("view engine", "ejs");
@@ -33,6 +33,7 @@ app.use(helmet()); // Secures the app by applying HTTP headers
 
 // Routes
 app.use("/api/user", users);
+app.use("/api/interview", interviews);
 
 app.listen(PORT, (err) => {
   if (err) {
