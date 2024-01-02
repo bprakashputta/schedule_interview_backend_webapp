@@ -4,74 +4,94 @@ const { Interview, validate } = require("../models/interview");
 const { User } = require("../models/user");
 
 // POST endpoint for creating interviews
-interviewRouter.post("/create", async (req, res) => {
+interviewRouter.post("/create", async (request, response) => {
   // Validate the request body
-  const { error } = validate(req.body);
+  const { error } = validate(request.body);
   if (error) {
-    return res.status(400).send(error.details[0].message);
+    return response.status(400).send(error.details[0].message);
   }
 
   try {
     // Validate start time and end time
-    const startTime = new Date(req.body.startTime);
-    const endTime = new Date(req.body.endTime);
+    const startTime = new Date(request.body.startTime);
+    const endTime = new Date(request.body.endTime);
 
     if (startTime <= new Date() || endTime <= startTime) {
-      return res.status(400).send("Invalid start time or end time.");
+      return response.status(400).send("Invalid start time or end time.");
     }
 
     // Check interviewer availability
-    const areInterviewersAvailable = checkParticipantAvailability(
-      req.body.interviewer,
+    const areInterviewersAvailable = await checkParticipantAvailability(
+      request.body.interviewers,
       startTime,
       endTime
     );
 
+    console.log("Intervieweers availability : ", areInterviewersAvailable);
+    //
     if (!areInterviewersAvailable) {
-      return res
+      return response
         .status(400)
         .send("Interviewers are not available at the specified time.");
     }
 
     // Check candidate availability
     const isCandidateAvailable = checkParticipantAvailability(
-      [req.body.candidate],
+      [request.body.candidate],
       startTime,
       endTime
     );
 
     if (!isCandidateAvailable) {
-      return res
+      // Return candidate not available at the specified time
+      return response
         .status(400)
         .send("Candidate is not available at the specified time.");
     }
 
     // Continue with creating the interview
     const interview = new Interview({
-      interviewer: req.body.interviewer,
-      candidate: req.body.candidate,
+      interviewers: request.body.interviewers,
+      candidate: request.body.candidate,
       startTime: startTime,
-      duration: req.body.duration,
+      duration: (endTime - startTime) / (60 * 1000),
       endTime: endTime,
-      location: req.body.location,
-      title: req.body.title,
-      description: req.body.description,
-      interviewlink: req.body.interviewlink,
+      location: request.body.location,
+      title: request.body.title,
+      description: request.body.description,
+      interviewlink: request.body.interviewlink,
     });
 
     // Save the interview to the database
     await interview.save();
 
+    // Update interview IDs for interviewers
+    await Promise.all(
+      request.body.interviewers.map(async (interviewerId) => {
+        // Update the interview array in the participant's document
+        await User.findByIdAndUpdate(
+          interviewerId,
+          { $push: { interviews: interview._id } },
+          { new: true }
+        );
+      })
+    );
+
+    // Update interview ID for the candidate
+    await User.findByIdAndUpdate(
+      request.body.candidate,
+      { $push: { interviews: interview._id } },
+      { new: true }
+    );
+    //
+
     // Send the created interview as the response
-    res.send(interview);
+    response.send(interview);
   } catch (ex) {
     console.error(ex);
-    res.status(500).send("Internal Server Error");
+    response.status(500).send("Internal Server Error");
   }
 });
-
-const mongoose = require("mongoose");
-const { User } = require("../models/user"); // Assuming your User model is in this file
 
 // Function to get participant interview time slots using Mongoose
 async function getParticipantAvailability(participantId) {
@@ -89,6 +109,8 @@ async function getParticipantAvailability(participantId) {
 // Function to check participant availability
 async function checkParticipantAvailability(participants, startTime, endTime) {
   try {
+    participants = Object.values(participants);
+
     // Check availability for each participant
     const areParticipantsAvailable = await Promise.all(
       participants.map(async (participantId) => {
@@ -98,9 +120,13 @@ async function checkParticipantAvailability(participants, startTime, endTime) {
         );
 
         // Check if there's any overlap between the requested time and the participant's interview time slots
-        const isOverlap = participantInterviews.some((interview) => {
-          const interviewStartTime = new Date(interview.startTime);
-          const interviewEndTime = new Date(interview.endTime);
+        const isOverlap = participantInterviews.some(async (interviewId) => {
+          //Fetch the interview object
+          let interview = await Interview.findById(interviewId);
+
+          //Get the start and end times of the interview
+          let interviewStartTime = new Date(interview.startTime);
+          let interviewEndTime = new Date(interview.endTime);
 
           return startTime < interviewEndTime && endTime > interviewStartTime;
         });
