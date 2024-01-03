@@ -2,6 +2,37 @@ const express = require("express");
 const interviewRouter = express.Router();
 const { Interview, validate } = require("../models/interview");
 const { User } = require("../models/user");
+const mongoose = require("mongoose");
+
+// GET endpoint to retrieve interview details by ID
+interviewRouter.get("/:interviewId", async (request, response) => {
+  try {
+    const interviewId = request.params.interviewId;
+
+    // Validate that interviewId is a valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(interviewId)) {
+      return response.status(400).send("Invalid interview ID.");
+    }
+
+    // Find the interview by ID
+    // Populate interviewers with specific fields
+    // Populate candidate with specific fields
+    const interview = await Interview.findById(interviewId)
+      .populate("interviewers", "name email")
+      .populate("candidate", "name email");
+
+    // Check if the interview exists
+    if (!interview) {
+      return response.status(404).send("Interview not found.");
+    }
+
+    // Send the interview details as the response
+    response.send(interview);
+  } catch (ex) {
+    console.error(ex);
+    response.status(500).send("Internal Server Error");
+  }
+});
 
 // POST endpoint for creating interviews
 interviewRouter.post("/create", async (request, response) => {
@@ -103,6 +134,10 @@ interviewRouter.post("/create", async (request, response) => {
 interviewRouter.put("/update/:interviewId", async (request, response) => {
   // Get the interview Id
   const interviewId = request.params.interviewId;
+  // Validate that interviewId is a valid ObjectId
+  if (!mongoose.Types.ObjectId.isValid(interviewId)) {
+    return response.status(400).send("Invalid interview ID.");
+  }
 
   // Validate the request body
   const { error } = await validate(request.body);
