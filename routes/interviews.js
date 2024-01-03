@@ -6,7 +6,7 @@ const { User } = require("../models/user");
 // POST endpoint for creating interviews
 interviewRouter.post("/create", async (request, response) => {
   // Validate the request body
-  const { error } = validate(request.body);
+  const { error } = await validate(request.body);
   if (error) {
     return response.status(400).send(error.details[0].message);
   }
@@ -104,7 +104,7 @@ interviewRouter.put("/update/:interviewId", async (request, response) => {
   const interviewId = request.params.interviewId;
 
   // Validate the request body
-  const { error } = validate(request.body);
+  const { error } = await validate(request.body);
   if (error) {
     return response.status(400).send(error.details[0].message);
   }
@@ -200,6 +200,21 @@ interviewRouter.put("/update/:interviewId", async (request, response) => {
         );
       })
     );
+
+    // If the candidate is changed, update interview ID for the old and new candidate
+    if (existingInterview.candidate.toString() !== request.body.candidate) {
+      await User.findByIdAndUpdate(
+        existingInterview.candidate,
+        { $pull: { interviews: interviewId } },
+        { new: true }
+      );
+
+      await User.findByIdAndUpdate(
+        request.body.candidate,
+        { $push: { interviews: interviewId } },
+        { new: true }
+      );
+    }
 
     // Send the updated interview as the response
     response.send(updatedInterview);
