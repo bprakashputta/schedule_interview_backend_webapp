@@ -67,12 +67,22 @@ const Interview = mongoose.model("Interview", interviewSchema);
 
 // Validate Interview Model
 async function validateSchema(interview) {
+  const { candidate } = interview;
+
+  if (Array.isArray(candidate)) {
+    return {
+      error: {
+        details: [{ message: "Multiple candidates not allowed" }],
+      },
+    };
+  }
+
   const schema = Joi.object({
     interviewers: Joi.array()
       .items(Joi.object({ userId: JoiObjectId().required() }))
       .required()
       .min(1),
-    candidateId: JoiObjectId().required(),
+    candidate: JoiObjectId().required(),
     startTime: Joi.date().required(),
     duration: Joi.number().valid(30, 45, 60, 90, 120).required(),
     endTime: Joi.date(),
@@ -81,7 +91,13 @@ async function validateSchema(interview) {
     description: Joi.string().max(500),
     interviewlink: Joi.string().max(500),
   });
-  return schema.validate(interview);
+
+  const { error } = schema.validate(interview);
+  if (error) {
+    return { error: error.details[0].message };
+  }
+
+  return { validated: true };
 }
 
 // Export Interview Model
