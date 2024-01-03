@@ -98,8 +98,9 @@ interviewRouter.post("/create", async (request, response) => {
   }
 });
 
+// PUT endpoint for updating interviews
 interviewRouter.put("/update/:interviewId", async (request, response) => {
-  //Get the interview Id
+  // Get the interview Id
   const interviewId = request.params.interviewId;
 
   // Validate the request body
@@ -149,6 +150,9 @@ interviewRouter.put("/update/:interviewId", async (request, response) => {
         .send("Candidate is not available at the specified time.");
     }
 
+    // Get the existing interview
+    const existingInterview = await Interview.findById(interviewId);
+
     // Update the interview
     const updatedInterview = await Interview.findByIdAndUpdate(
       interviewId,
@@ -164,6 +168,37 @@ interviewRouter.put("/update/:interviewId", async (request, response) => {
         interviewlink: request.body.interviewlink,
       },
       { new: true } // Return the updated document
+    );
+
+    // Update interview IDs for interviewers
+    const removedInterviewers = existingInterview.interviewers.filter(
+      (interviewerId) => !request.body.interviewers.includes(interviewerId)
+    );
+
+    const addedInterviewers = request.body.interviewers.filter(
+      (interviewerId) => !existingInterview.interviewers.includes(interviewerId)
+    );
+
+    // Remove interview ID from removed interviewers
+    await Promise.all(
+      removedInterviewers.map(async (interviewerId) => {
+        await User.findByIdAndUpdate(
+          interviewerId,
+          { $pull: { interviews: interviewId } },
+          { new: true }
+        );
+      })
+    );
+
+    // Add interview ID to added interviewers
+    await Promise.all(
+      addedInterviewers.map(async (interviewerId) => {
+        await User.findByIdAndUpdate(
+          interviewerId,
+          { $push: { interviews: interviewId } },
+          { new: true }
+        );
+      })
     );
 
     // Send the updated interview as the response
@@ -187,7 +222,7 @@ async function getParticipantInterviews(participantId) {
   }
 }
 
-// Function to check participant availability for an interview (PUT API version)
+// Function to check participant availability for an interview
 async function checkParticipantAvailability(
   participants,
   startTime,
@@ -205,20 +240,19 @@ async function checkParticipantAvailability(
           participantId
         );
 
-        console.log("Hi Bhanu");
         // Check if there's any overlap between the requested time and the participant's interview time slots
-        const isOverlap = participantInterviews.some(async (interviewId) => {
-          return await checkOverlap(
-            interviewId,
-            excludedInterviewId,
-            startTime,
-            endTime
-          );
-        });
+        const overlapStatusArray = await Promise.all(
+          participantInterviews.map(async (interviewId) => {
+            return checkOverlap(
+              interviewId,
+              excludedInterviewId,
+              startTime,
+              endTime
+            );
+          })
+        );
 
-        console.log("isOverlap : ", isOverlap);
-
-        return !isOverlap; // Return true if no overlap, false if there's an overlap
+        return overlapStatusArray.every((overlapStatus) => !overlapStatus);
       })
     );
 
@@ -254,10 +288,25 @@ async function checkOverlap(
   console.log("startTime", startTime);
   console.log("endTime", endTime);
 
-  if (
+  if (startTime.getTime() == interviewStartTime.getTime()) {
+    // Both start times are same
+    console.log("loop1");
+    return true;
+  } else if (
+    (startTime.getTime() >= interviewStartTime.getTime() &&
+      startTime.getTime() < interviewEndTime.getTime()) ||
+    (endTime.getTime() > interviewStartTime.getTime() &&
+      endTime.getTime() < interviewEndTime.getTime())
+  ) {
+    // Start time and end time of interviews conflict with existing interview
+    console.log("loop2");
+    return true;
+  } else if (
     startTime.getTime() == interviewEndTime.getTime() ||
     endTime.getTime() == interviewStartTime.getTime()
   ) {
+    // Interviews start right after one ends
+    console.log("loop3");
     console.log(
       "startTime.getTime() == interviewEndTime.getTime() ",
       startTime.getTime() == interviewEndTime.getTime()
@@ -265,7 +314,15 @@ async function checkOverlap(
     return false;
   }
 
-  return startTime < interviewEndTime && endTime > interviewStartTime;
+  console.log(
+    "came heere : ",
+    startTime.getTime() >= interviewStartTime.getTime(),
+    startTime.getTime() < interviewEndTime.getTime(),
+    endTime.getTime() > interviewStartTime.getTime(),
+    endTime.getTime() < interviewEndTime.getTime()
+  );
+  console.log("out of everything");
+  return false;
 }
 
 module.exports = interviewRouter;
