@@ -36,12 +36,11 @@ const interviewSchema = new mongoose.Schema({
   },
   duration: {
     type: Number,
-    enum: [30, 45, 60, 90, 120],
     required: true,
   },
   endTime: {
     type: Date,
-    // You can handle this with a virtual property
+    required: true,
   },
   location: {
     type: String,
@@ -56,7 +55,7 @@ const interviewSchema = new mongoose.Schema({
     type: String,
     maxlength: 500,
   },
-  interviewlink: {
+  interviewLink: {
     type: String,
     maxlength: 255,
   },
@@ -72,32 +71,23 @@ async function validateSchema(interview) {
   if (Array.isArray(candidate)) {
     return {
       error: {
-        details: [{ message: "Multiple candidates not allowed" }],
+        details: [{ message: "Multiple candidates not Allowed" }],
       },
     };
   }
 
   const schema = Joi.object({
-    interviewers: Joi.array()
-      .items(Joi.object({ userId: JoiObjectId().required() }))
-      .required()
-      .min(1),
+    interviewers: Joi.array().items(JoiObjectId().required()).required().min(1),
     candidate: JoiObjectId().required(),
     startTime: Joi.date().required(),
-    duration: Joi.number().valid(30, 45, 60, 90, 120).required(),
-    endTime: Joi.date(),
+    duration: Joi.number(),
+    endTime: Joi.date().required(),
     location: Joi.string(),
     title: Joi.string().min(10).max(255),
     description: Joi.string().max(500),
-    interviewlink: Joi.string().max(500),
+    interviewLink: Joi.string().max(500),
   });
-
-  const { error } = schema.validate(interview);
-  if (error) {
-    return { error: error.details[0].message };
-  }
-
-  return { validated: true };
+  return schema.validate(interview);
 }
 
 // Export Interview Model

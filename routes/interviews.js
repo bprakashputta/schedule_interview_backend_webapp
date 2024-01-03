@@ -8,6 +8,7 @@ interviewRouter.post("/create", async (request, response) => {
   // Validate the request body
   const { error } = await validate(request.body);
   if (error) {
+    console.log("Error : ", error);
     return response.status(400).send(error.details[0].message);
   }
 
@@ -106,6 +107,7 @@ interviewRouter.put("/update/:interviewId", async (request, response) => {
   // Validate the request body
   const { error } = await validate(request.body);
   if (error) {
+    console.log("Hey ", error);
     return response.status(400).send(error.details[0].message);
   }
 
