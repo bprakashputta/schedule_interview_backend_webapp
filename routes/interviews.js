@@ -13,8 +13,12 @@ interviewRouter.post("/create", async (request, response) => {
 
   try {
     // Validate start time and end time
-    const startTime = new Date(request.body.startTime);
-    const endTime = new Date(request.body.endTime);
+    let startTime = new Date(request.body.startTime);
+    let endTime = new Date(request.body.endTime);
+
+    // Ensure time zone information is included
+    startTime = new Date(startTime.toISOString());
+    endTime = new Date(endTime.toISOString());
 
     if (startTime <= new Date() || endTime <= startTime) {
       return response.status(400).send("Invalid start time or end time.");
@@ -24,11 +28,12 @@ interviewRouter.post("/create", async (request, response) => {
     const areInterviewersAvailable = await checkParticipantAvailability(
       request.body.interviewers,
       startTime,
-      endTime
+      endTime,
+      null
     );
 
     console.log("Intervieweers availability : ", areInterviewersAvailable);
-    //
+
     if (!areInterviewersAvailable) {
       return response
         .status(400)
@@ -36,10 +41,11 @@ interviewRouter.post("/create", async (request, response) => {
     }
 
     // Check candidate availability
-    const isCandidateAvailable = checkParticipantAvailability(
+    const isCandidateAvailable = await checkParticipantAvailability(
       [request.body.candidate],
       startTime,
-      endTime
+      endTime,
+      null
     );
 
     if (!isCandidateAvailable) {
@@ -83,7 +89,6 @@ interviewRouter.post("/create", async (request, response) => {
       { $push: { interviews: interview._id } },
       { new: true }
     );
-    //
 
     // Send the created interview as the response
     response.send(interview);
@@ -93,8 +98,84 @@ interviewRouter.post("/create", async (request, response) => {
   }
 });
 
+interviewRouter.put("/update/:interviewId", async (request, response) => {
+  //Get the interview Id
+  const interviewId = request.params.interviewId;
+
+  // Validate the request body
+  const { error } = validate(request.body);
+  if (error) {
+    return response.status(400).send(error.details[0].message);
+  }
+
+  try {
+    // Validate start time and end time
+    let startTime = new Date(request.body.startTime);
+    let endTime = new Date(request.body.endTime);
+
+    // Ensure time zone information is included
+    startTime = new Date(startTime.toISOString());
+    endTime = new Date(endTime.toISOString());
+
+    if (startTime <= new Date() || endTime <= startTime) {
+      return response.status(400).send("Invalid start time or end time.");
+    }
+
+    // Check interviewer availability
+    const areInterviewersAvailable = await checkParticipantAvailability(
+      request.body.interviewers,
+      startTime,
+      endTime,
+      interviewId
+    );
+
+    if (!areInterviewersAvailable) {
+      return response
+        .status(400)
+        .send("Interviewers are not available at the specified time.");
+    }
+
+    // Check candidate availability
+    const isCandidateAvailable = await checkParticipantAvailability(
+      [request.body.candidate],
+      startTime,
+      endTime,
+      interviewId
+    );
+
+    if (!isCandidateAvailable) {
+      return response
+        .status(400)
+        .send("Candidate is not available at the specified time.");
+    }
+
+    // Update the interview
+    const updatedInterview = await Interview.findByIdAndUpdate(
+      interviewId,
+      {
+        interviewers: request.body.interviewers,
+        candidate: request.body.candidate,
+        startTime: startTime,
+        duration: (endTime - startTime) / (60 * 1000),
+        endTime: endTime,
+        location: request.body.location,
+        title: request.body.title,
+        description: request.body.description,
+        interviewlink: request.body.interviewlink,
+      },
+      { new: true } // Return the updated document
+    );
+
+    // Send the updated interview as the response
+    response.send(updatedInterview);
+  } catch (ex) {
+    console.error(ex);
+    response.status(500).send("Internal Server Error");
+  }
+});
+
 // Function to get participant interview time slots using Mongoose
-async function getParticipantAvailability(participantId) {
+async function getParticipantInterviews(participantId) {
   try {
     // Replace 'interviews' with the actual field name where interview time slots are stored in your User schema
     const user = await User.findById(participantId, "interviews");
@@ -106,8 +187,13 @@ async function getParticipantAvailability(participantId) {
   }
 }
 
-// Function to check participant availability
-async function checkParticipantAvailability(participants, startTime, endTime) {
+// Function to check participant availability for an interview (PUT API version)
+async function checkParticipantAvailability(
+  participants,
+  startTime,
+  endTime,
+  excludedInterviewId
+) {
   try {
     participants = Object.values(participants);
 
@@ -115,21 +201,22 @@ async function checkParticipantAvailability(participants, startTime, endTime) {
     const areParticipantsAvailable = await Promise.all(
       participants.map(async (participantId) => {
         // Fetch interview time slots for the participant
-        const participantInterviews = await getParticipantAvailability(
+        const participantInterviews = await getParticipantInterviews(
           participantId
         );
 
+        console.log("Hi Bhanu");
         // Check if there's any overlap between the requested time and the participant's interview time slots
         const isOverlap = participantInterviews.some(async (interviewId) => {
-          //Fetch the interview object
-          let interview = await Interview.findById(interviewId);
-
-          //Get the start and end times of the interview
-          let interviewStartTime = new Date(interview.startTime);
-          let interviewEndTime = new Date(interview.endTime);
-
-          return startTime < interviewEndTime && endTime > interviewStartTime;
+          return await checkOverlap(
+            interviewId,
+            excludedInterviewId,
+            startTime,
+            endTime
+          );
         });
+
+        console.log("isOverlap : ", isOverlap);
 
         return !isOverlap; // Return true if no overlap, false if there's an overlap
       })
@@ -138,8 +225,47 @@ async function checkParticipantAvailability(participants, startTime, endTime) {
     return areParticipantsAvailable.every(Boolean); // Return true if all participants are available, false otherwise
   } catch (error) {
     console.error(error);
-    throw new Error("Error checking participant availability");
+    throw new Error("Error checking participant availability for update");
   }
+}
+
+async function checkOverlap(
+  interviewId,
+  excludedInterviewId,
+  startTime,
+  endTime
+) {
+  if (
+    excludedInterviewId != null &&
+    interviewId.toString() === excludedInterviewId.toString()
+  ) {
+    return false; // Exclude the current interview from overlap check
+  }
+
+  // Fetch the interview object
+  let interview = await Interview.findById(interviewId);
+
+  // Get the start and end times of the interview
+  let interviewStartTime = new Date(interview.startTime);
+  let interviewEndTime = new Date(interview.endTime);
+
+  console.log("interviewStartTime", interviewStartTime);
+  console.log("interviewEndTime", interviewEndTime);
+  console.log("startTime", startTime);
+  console.log("endTime", endTime);
+
+  if (
+    startTime.getTime() == interviewEndTime.getTime() ||
+    endTime.getTime() == interviewStartTime.getTime()
+  ) {
+    console.log(
+      "startTime.getTime() == interviewEndTime.getTime() ",
+      startTime.getTime() == interviewEndTime.getTime()
+    );
+    return false;
+  }
+
+  return startTime < interviewEndTime && endTime > interviewStartTime;
 }
 
 module.exports = interviewRouter;
