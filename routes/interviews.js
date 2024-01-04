@@ -2,12 +2,60 @@ const express = require("express");
 const interviewRouter = express.Router();
 const { Interview, validate } = require("../models/interview");
 const { User } = require("../models/user");
+const mongoose = require("mongoose");
+
+// GET endpoint for fetching all interviews
+interviewRouter.get("/all", async (req, res) => {
+  try {
+    // Fetch all interviews
+    const interviews = await Interview.find()
+      .populate("interviewers", "name email") // Populate interviewers with specific fields
+      .populate("candidate", "name email");
+
+    // Send the interviews as the response
+    res.render("home", { interviews });
+  } catch (ex) {
+    console.error(ex);
+    res.status(500).send("Internal Server Error");
+  }
+});
+
+// GET endpoint to retrieve interview details by ID
+interviewRouter.get("/:interviewId", async (request, response) => {
+  try {
+    const interviewId = request.params.interviewId;
+
+    // Validate that interviewId is a valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(interviewId)) {
+      return response.status(400).send("Invalid interview ID.");
+    }
+
+    // Find the interview by ID
+    // Populate interviewers with specific fields
+    // Populate candidate with specific fields
+    const interview = await Interview.findById(interviewId)
+      .populate("interviewers", "name email")
+      .populate("candidate", "name email");
+
+    // Check if the interview exists
+    if (!interview) {
+      return response.status(404).send("Interview not found.");
+    }
+
+    // Send the interview details as the response
+    response.send(interview);
+  } catch (ex) {
+    console.error(ex);
+    response.status(500).send("Internal Server Error");
+  }
+});
 
 // POST endpoint for creating interviews
 interviewRouter.post("/create", async (request, response) => {
   // Validate the request body
   const { error } = await validate(request.body);
   if (error) {
+    console.log("Error : ", error);
     return response.status(400).send(error.details[0].message);
   }
 
@@ -102,10 +150,15 @@ interviewRouter.post("/create", async (request, response) => {
 interviewRouter.put("/update/:interviewId", async (request, response) => {
   // Get the interview Id
   const interviewId = request.params.interviewId;
+  // Validate that interviewId is a valid ObjectId
+  if (!mongoose.Types.ObjectId.isValid(interviewId)) {
+    return response.status(400).send("Invalid interview ID.");
+  }
 
   // Validate the request body
   const { error } = await validate(request.body);
   if (error) {
+    console.log("Hey ", error);
     return response.status(400).send(error.details[0].message);
   }
 
@@ -218,6 +271,54 @@ interviewRouter.put("/update/:interviewId", async (request, response) => {
 
     // Send the updated interview as the response
     response.send(updatedInterview);
+  } catch (ex) {
+    console.error(ex);
+    response.status(500).send("Internal Server Error");
+  }
+});
+
+// DELETE endpoint for deleting an interview
+interviewRouter.delete("/delete/:interviewId", async (request, response) => {
+  // Get the interview ID
+  const interviewId = request.params.interviewId;
+
+  // Validate that interviewId is a valid ObjectId
+  if (!mongoose.Types.ObjectId.isValid(interviewId)) {
+    return response.status(400).send("Invalid interview ID.");
+  }
+
+  try {
+    // Find the interview by ID
+    const interviewToDelete = await Interview.findOne({ _id: interviewId });
+
+    // Check if the interview exists
+    if (!interviewToDelete) {
+      return response.status(404).send("Interview not found.");
+    }
+
+    // Remove the interview ID from interviewers' documents
+    await Promise.all(
+      interviewToDelete.interviewers.map(async (interviewerId) => {
+        await User.findByIdAndUpdate(
+          interviewerId,
+          { $pull: { interviews: interviewId } },
+          { new: true }
+        );
+      })
+    );
+
+    // Remove the interview ID from the candidate's document
+    await User.findByIdAndUpdate(
+      interviewToDelete.candidate,
+      { $pull: { interviews: interviewId } },
+      { new: true }
+    );
+
+    // Delete the interview
+    await Interview.findOneAndDelete({ _id: interviewId });
+
+    // Send a success message
+    response.send("Interview deleted successfully.");
   } catch (ex) {
     console.error(ex);
     response.status(500).send("Internal Server Error");
