@@ -35,7 +35,7 @@ userRouter.post("/adduser", async (request, response) => {
       email: request.body.emailId,
       // Commenting the password field because I'm not enforcing login criteria at this moment.
       //   password: request.body.password,
-      roleType: request.body.roleType, // Assuming you have a roleType field
+      roleType: request.body.roleType,
       resumeLink: request.body.resumeLink,
     });
 

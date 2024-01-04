@@ -8,6 +8,7 @@ const helmet = require("helmet");
 const morgan = require("morgan");
 const bodyParser = require("body-parser");
 const { check, validationResult } = require("express-validator");
+const path = require("path");
 const PORT = 8082;
 
 // Connect to Database
@@ -23,7 +24,9 @@ mongoose
 const interviews = require("./routes/interviews");
 const users = require("./routes/users");
 
+// Set EJS Template Engine
 app.set("view engine", "ejs");
+app.set("views", path.join(__dirname, "views"));
 
 // Middlewares
 app.use(express.json());

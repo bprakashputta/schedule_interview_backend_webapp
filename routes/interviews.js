@@ -13,7 +13,7 @@ interviewRouter.get("/all", async (req, res) => {
       .populate("candidate", "name email");
 
     // Send the interviews as the response
-    res.send(interviews);
+    res.render("home", { interviews });
   } catch (ex) {
     console.error(ex);
     res.status(500).send("Internal Server Error");
