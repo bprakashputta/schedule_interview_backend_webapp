@@ -6,6 +6,8 @@
     2. npm start
     3. Import Postman Collections
 
+    Note:- I have used .env file for storing database URL instead of directly  using the username and password in server.js, to test out this code on your local, you'll have to configure your mongodb database url before you can use the code.
+
 ### Objective
 
 The goal is to create a simple web application with an admin user, who would be able to create interview slots
