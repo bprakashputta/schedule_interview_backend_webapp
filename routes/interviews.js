@@ -379,6 +379,7 @@ async function checkParticipantAvailability(
   }
 }
 
+// Function to check overlap between time slots
 async function checkOverlap(
   interviewId,
   excludedInterviewId,

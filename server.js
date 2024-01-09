@@ -31,7 +31,7 @@ app.set("views", path.join(__dirname, "views"));
 // Middlewares
 app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // parse url parameters to request body
-app.use(express.static("public")); // Serve static files like html, images, javascript to server
+app.use(express.static(path.join(__dirname, "public"))); // Serve static files like html, images, javascript to server
 app.use(helmet()); // Secures the app by applying HTTP headers
 
 // Routes
