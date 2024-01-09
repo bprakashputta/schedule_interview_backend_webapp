@@ -32,7 +32,7 @@ Edit interviews
     ii.) Check if the new fields passed for the interview are valid and available(startime, endtime, interviewer availability)
     ii.) Backend will also through error if there are less than 2 participants{ 1 candidate, 1 or more interviewers)
 
-Additional features:-
+Future Scope:-
 
 Send emails to participants after scheduling the interview
 An option to upload resume
